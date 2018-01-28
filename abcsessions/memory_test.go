@@ -19,7 +19,6 @@ func TestMemoryStorerNew(t *testing.T) {
 }
 
 func TestMemoryStorerNewDefault(t *testing.T) {
-	t.Parallel()
 
 	m, err := NewDefaultMemoryStorer()
 	if err != nil {
@@ -34,7 +33,6 @@ func TestMemoryStorerNewDefault(t *testing.T) {
 }
 
 func TestMemoryStorerAll(t *testing.T) {
-	t.Parallel()
 
 	m, _ := NewDefaultMemoryStorer()
 
@@ -65,7 +63,6 @@ func TestMemoryStorerAll(t *testing.T) {
 }
 
 func TestMemoryStorerGet(t *testing.T) {
-	t.Parallel()
 
 	m, _ := NewDefaultMemoryStorer()
 
@@ -86,7 +83,6 @@ func TestMemoryStorerGet(t *testing.T) {
 }
 
 func TestMemoryStorerSet(t *testing.T) {
-	t.Parallel()
 
 	m, _ := NewDefaultMemoryStorer()
 
@@ -120,7 +116,6 @@ func TestMemoryStorerSet(t *testing.T) {
 }
 
 func TestMemoryStorerDel(t *testing.T) {
-	t.Parallel()
 
 	m, _ := NewDefaultMemoryStorer()
 
@@ -208,7 +203,6 @@ func TestMemoryStorerCleaner(t *testing.T) {
 }
 
 func TestMemoryStorerResetExpiry(t *testing.T) {
-	t.Parallel()
 
 	m, err := NewDefaultMemoryStorer()
 	if err != nil {

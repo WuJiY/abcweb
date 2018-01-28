@@ -1,6 +1,7 @@
 package abcsessions
 
 import (
+	"context"
 	"net/http"
 	"time"
 )
@@ -53,7 +54,7 @@ func (c CookieOptions) makeCookie(value string) *http.Cookie {
 }
 
 // deleteCookie sets the cookie to a deleted value to force the client to delete
-func (c CookieOptions) deleteCookie(w http.ResponseWriter) {
+func (c CookieOptions) deleteCookie(r *http.Request) {
 	cookie := &http.Cookie{
 		// If the browser refuses to delete it, set value to "" so subsequent
 		// requests replace it when it does not point to a valid session id.
@@ -67,15 +68,31 @@ func (c CookieOptions) deleteCookie(w http.ResponseWriter) {
 		Secure:   c.Secure,
 	}
 
-	w.(cookieWriter).SetCookie(cookie)
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
+	}
+
+	cookies.SetCookie(cookie)
+	ctx = context.WithValue(ctx, "cookies", cookies)
+	r.WithContext(ctx)
 }
 
 // getCookieValue returns the cookie value (usually the ID of the session)
 // stored in the cookies cache. If it does not exist in the cookies cache
 // it will attempt to fetch it from the request headers.
 // If this fails it will return nil.
-func (c CookieOptions) getCookieValue(w http.ResponseWriter, r *http.Request) (string, error) {
-	cookie := w.(cookieWriter).GetCookie(c.Name)
+func (c CookieOptions) getCookieValue(r *http.Request) (string, error) {
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		return "", errNoSession{}
+	}
+
+	cookie := cookies.cookies[c.Name]
 	if cookie != nil {
 		return cookie.Value, nil
 	}

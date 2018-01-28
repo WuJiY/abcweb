@@ -50,9 +50,6 @@ type Resetter interface {
 	ResetExpiry(w http.ResponseWriter, r *http.Request) error
 	// ResetMiddleware will reset the users session expiry on every request
 	ResetMiddleware(next http.Handler) http.Handler
-	// MiddlewareWithReset converts the writer to a sessionsResponseWriter
-	// and will reset the users session expiry on every request
-	MiddlewareWithReset(next http.Handler) http.Handler
 }
 
 // timer interface is used to mock the test harness for disk and memory storers

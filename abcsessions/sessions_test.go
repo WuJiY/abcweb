@@ -1,16 +1,16 @@
 package abcsessions
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 )
 
 func TestSetAndGet(t *testing.T) {
-	t.Parallel()
 
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
@@ -57,10 +57,9 @@ func TestSetAndGet(t *testing.T) {
 }
 
 func TestDel(t *testing.T) {
-	t.Parallel()
 
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
@@ -105,10 +104,9 @@ type TestSessJSON struct {
 }
 
 func TestSetAndGetObj(t *testing.T) {
-	t.Parallel()
 
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
@@ -163,10 +161,9 @@ func TestSetAndGetObj(t *testing.T) {
 }
 
 func TestAddFlash(t *testing.T) {
-	t.Parallel()
 
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
@@ -183,16 +180,23 @@ func TestAddFlash(t *testing.T) {
 	if sess.value != `{"Value":null,"Flash":{"test":"flashvalue"}}` {
 		t.Errorf("expected session value to be %q, but got %q", `{"test":"flashvalue"}`, sess.value)
 	}
-	if len(w.cookies) != 1 {
-		t.Error("expected cookies len 1, got:", len(w.cookies))
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
+	}
+
+	if len(cookies.cookies) != 1 {
+		t.Error("expected cookies len 1, got:", len(cookies.cookies))
 	}
 }
 
 func TestGetFlash(t *testing.T) {
-	t.Parallel()
 
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
@@ -212,9 +216,17 @@ func TestGetFlash(t *testing.T) {
 	if val != "flashvalue" {
 		t.Errorf("Expected value to be %q but got %q", "flashvalue", val)
 	}
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
+	}
+
 	// Ensure len cookies and sessions are still present
-	if len(w.cookies) != 1 {
-		t.Error("expected cookies len to be 1, got:", len(w.cookies))
+	if len(cookies.cookies) != 1 {
+		t.Error("expected cookies len to be 1, got:", len(cookies.cookies))
 	}
 	if len(m.sessions) != 1 {
 		t.Error("expected sessions len to be 1, got:", len(m.sessions))
@@ -243,10 +255,9 @@ type TestFlashObj struct {
 }
 
 func TestFlashAddAndGetObj(t *testing.T) {
-	t.Parallel()
 
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
@@ -283,10 +294,9 @@ func TestFlashAddAndGetObj(t *testing.T) {
 }
 
 func TestFlashCombined(t *testing.T) {
-	t.Parallel()
 
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
@@ -323,10 +333,9 @@ func TestFlashCombined(t *testing.T) {
 }
 
 func TestFlashCombinedTwo(t *testing.T) {
-	t.Parallel()
 
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
@@ -363,10 +372,9 @@ func TestFlashCombinedTwo(t *testing.T) {
 }
 
 func TestAddFlashAndSetCombined(t *testing.T) {
-	t.Parallel()
 
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
@@ -443,7 +451,6 @@ func TestAddFlashAndSetCombined(t *testing.T) {
 }
 
 func TestValidKey(t *testing.T) {
-	t.Parallel()
 
 	// Example:
 	keys := map[string]bool{

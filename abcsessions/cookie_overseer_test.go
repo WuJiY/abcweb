@@ -14,14 +14,12 @@ var testCookieKey = []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 var rgxCookieExpires = regexp.MustCompile(`.*Expires=([^;]*);.*`)
 
 func TestCookieImplements(t *testing.T) {
-	t.Parallel()
 
 	// Do assign to nothing to check if implementation of CookieOverseer is complete
 	var _ Overseer = &CookieOverseer{}
 }
 
 func TestCookieOverseerNew(t *testing.T) {
-	t.Parallel()
 
 	c := NewCookieOverseer(NewCookieOptions(), testCookieKey)
 	if c == nil {
@@ -38,10 +36,9 @@ func TestCookieOverseerNew(t *testing.T) {
 }
 
 func TestCookieOverseerGetFromCookie(t *testing.T) {
-	t.Parallel()
 
 	c := NewCookieOverseer(NewCookieOptions(), testCookieKey)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/", nil)
 
 	ct, err := c.encode("hello world")
@@ -64,11 +61,10 @@ func TestCookieOverseerGetFromCookie(t *testing.T) {
 }
 
 func TestCookieOverseerNoSession(t *testing.T) {
-	t.Parallel()
 
 	opts := NewCookieOptions()
 	c := NewCookieOverseer(opts, testCookieKey)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/", nil)
 
 	_, err := c.Get(w, r)
@@ -78,10 +74,9 @@ func TestCookieOverseerNoSession(t *testing.T) {
 }
 
 func TestCookieOverseerSet(t *testing.T) {
-	t.Parallel()
 
 	c := NewCookieOverseer(NewCookieOptions(), testCookieKey)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/", nil)
 
 	var err error
@@ -96,7 +91,15 @@ func TestCookieOverseerSet(t *testing.T) {
 		t.Error("value was wrong:", val)
 	}
 
-	if len(w.cookies) != 1 {
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
+	}
+
+	if len(cookies.cookies) != 1 {
 		t.Errorf("expected set cookie to be set")
 	}
 
@@ -106,17 +109,16 @@ func TestCookieOverseerSet(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(w.cookies) != 1 {
+	if len(cookies.cookies) != 1 {
 		t.Errorf("expected set cookie to be set")
 	}
 }
 
 func TestCookieOverseerDel(t *testing.T) {
-	t.Parallel()
 
 	opts := NewCookieOptions()
 	c := NewCookieOverseer(opts, testCookieKey)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/", nil)
 
 	err := c.Del(w, r)
@@ -125,7 +127,18 @@ func TestCookieOverseerDel(t *testing.T) {
 		t.Error(err)
 	}
 
-	cookie := w.cookies[opts.Name]
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
+	}
+
+	cookie := cookies.cookies[opts.Name]
+	if cookie == nil {
+		t.Fatal("nil cookie")
+	}
 	if !cookie.Expires.UTC().Before(time.Now().UTC().AddDate(0, 0, -1)) {
 		t.Error("Expected cookie expires to be set to a year ago, but was not:", cookie.Expires.String())
 	}
@@ -141,7 +154,6 @@ func TestCookieOverseerDel(t *testing.T) {
 }
 
 func TestCookieOverseerCrypto(t *testing.T) {
-	t.Parallel()
 
 	opts := CookieOptions{
 		Name: "id",
@@ -167,13 +179,12 @@ func TestCookieOverseerCrypto(t *testing.T) {
 }
 
 func TestCookieOverseerResetExpiry(t *testing.T) {
-	t.Parallel()
 
 	opts := NewCookieOptions()
 	opts.MaxAge = time.Hour * 1
 
 	c := NewCookieOverseer(opts, testCookieKey)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/", nil)
 
 	err := c.ResetExpiry(w, r)
@@ -186,11 +197,19 @@ func TestCookieOverseerResetExpiry(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(w.cookies) != 1 {
-		t.Errorf("Expected cookies len 1, got %d", len(w.cookies))
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
 	}
 
-	oldCookie := w.cookies[opts.Name]
+	if len(cookies.cookies) != 1 {
+		t.Errorf("Expected cookies len 1, got %d", len(cookies.cookies))
+	}
+
+	oldCookie := cookies.cookies[opts.Name]
 
 	// Sleep for a ms to offset time
 	time.Sleep(time.Nanosecond * 1)
@@ -200,11 +219,15 @@ func TestCookieOverseerResetExpiry(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(w.cookies) != 1 {
-		t.Errorf("Expected cookies len 1, got %d", len(w.cookies))
+	if len(cookies.cookies) != 1 {
+		t.Errorf("Expected cookies len 1, got %d", len(cookies.cookies))
 	}
 
-	newCookie := w.cookies[opts.Name]
+	newCookie := cookies.cookies[opts.Name]
+
+	if newCookie == nil {
+		t.Fatal("no cookie")
+	}
 
 	if !newCookie.Expires.After(oldCookie.Expires) || newCookie.Expires == oldCookie.Expires {
 		t.Errorf("Expected oldcookie and newcookie expires to be different, got:\n\n%#v\n%#v", oldCookie, newCookie)

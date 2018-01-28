@@ -31,7 +31,6 @@ func TestMain(m *testing.M) {
 }
 
 func TestDiskStorerNew(t *testing.T) {
-	t.Parallel()
 
 	d, err := NewDiskStorer(filepath.Join(testpath, "a"), time.Hour*11, time.Hour*12)
 	if err != nil {
@@ -49,7 +48,6 @@ func TestDiskStorerNew(t *testing.T) {
 }
 
 func TestDiskStorerAll(t *testing.T) {
-	t.Parallel()
 
 	d, err := NewDiskStorer(filepath.Join(testpath, "b"), 0, 0)
 	if err != nil {
@@ -86,7 +84,6 @@ func TestDiskStorerAll(t *testing.T) {
 }
 
 func TestDiskStorerGet(t *testing.T) {
-	t.Parallel()
 
 	d, err := NewDiskStorer(filepath.Join(testpath, "c"), 0, 0)
 	if err != nil {
@@ -112,7 +109,6 @@ func TestDiskStorerGet(t *testing.T) {
 }
 
 func TestDiskStorerSet(t *testing.T) {
-	t.Parallel()
 
 	d, err := NewDiskStorer(filepath.Join(testpath, "d"), 0, 0)
 	if err != nil {
@@ -160,7 +156,6 @@ func TestDiskStorerSet(t *testing.T) {
 }
 
 func TestDiskStorerDel(t *testing.T) {
-	t.Parallel()
 
 	d, err := NewDiskStorer(filepath.Join(testpath, "e"), 0, 0)
 	if err != nil {
@@ -288,7 +283,6 @@ func TestDiskStorerCleaner(t *testing.T) {
 }
 
 func TestDiskStorerResetExpiry(t *testing.T) {
-	t.Parallel()
 
 	d, err := NewDiskStorer(filepath.Join(testpath, "g"), 0, 0)
 	if err != nil {

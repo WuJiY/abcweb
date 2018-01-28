@@ -1,6 +1,7 @@
 package abcsessions
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -32,7 +33,7 @@ func NewStorageOverseer(opts CookieOptions, storer Storer) *StorageOverseer {
 
 // Get looks in the cookie for the session ID and retrieves the value string stored in the session.
 func (s *StorageOverseer) Get(w http.ResponseWriter, r *http.Request) (value string, err error) {
-	sessID, err := s.options.getCookieValue(w, r)
+	sessID, err := s.options.getCookieValue(r)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to get session id from cookie")
 	}
@@ -49,7 +50,7 @@ func (s *StorageOverseer) Get(w http.ResponseWriter, r *http.Request) (value str
 // If the session does not exist it creates a new one.
 func (s *StorageOverseer) Set(w http.ResponseWriter, r *http.Request, value string) error {
 	// Reuse the existing cookie ID if it exists
-	sessID, _ := s.options.getCookieValue(w, r)
+	sessID, _ := s.options.getCookieValue(r)
 
 	if len(sessID) == 0 {
 		sessID = uuid.NewV4().String()
@@ -60,19 +61,29 @@ func (s *StorageOverseer) Set(w http.ResponseWriter, r *http.Request, value stri
 		return errors.Wrap(err, "unable to set session value")
 	}
 
-	w.(cookieWriter).SetCookie(s.options.makeCookie(sessID))
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
+	}
+
+	cookies.SetCookie(s.options.makeCookie(sessID))
+	ctx = context.WithValue(ctx, "cookies", cookies)
+	r.WithContext(ctx)
 
 	return nil
 }
 
 // Del deletes the session if it exists and sets the session cookie to expire instantly.
 func (s *StorageOverseer) Del(w http.ResponseWriter, r *http.Request) error {
-	sessID, err := s.options.getCookieValue(w, r)
+	sessID, err := s.options.getCookieValue(r)
 	if err != nil {
 		return nil
 	}
 
-	s.options.deleteCookie(w)
+	s.options.deleteCookie(r)
 
 	err = s.Storer.Del(sessID)
 	if IsNoSessionError(err) {
@@ -86,7 +97,7 @@ func (s *StorageOverseer) Del(w http.ResponseWriter, r *http.Request) error {
 
 // Regenerate a new session ID for your current session
 func (s *StorageOverseer) Regenerate(w http.ResponseWriter, r *http.Request) error {
-	id, err := s.options.getCookieValue(w, r)
+	id, err := s.options.getCookieValue(r)
 	if err != nil {
 		return errors.Wrap(err, "unable to get session id from cookie")
 	}
@@ -108,7 +119,11 @@ func (s *StorageOverseer) Regenerate(w http.ResponseWriter, r *http.Request) err
 	}
 
 	// Override the old cookie with the new cookie
-	w.(cookieWriter).SetCookie(s.options.makeCookie(id))
+	ctx := r.Context()
+	cookies := ctx.Value("cookies").(*cookiesContext)
+	cookies.SetCookie(s.options.makeCookie(id))
+	ctx = context.WithValue(ctx, "cookies", cookies)
+	r.WithContext(ctx)
 
 	return nil
 }
@@ -116,13 +131,13 @@ func (s *StorageOverseer) Regenerate(w http.ResponseWriter, r *http.Request) err
 // SessionID returns the session ID stored in the cookie's value field.
 // It will return a errNoSession error if no session exists.
 func (s *StorageOverseer) SessionID(w http.ResponseWriter, r *http.Request) (string, error) {
-	return s.options.getCookieValue(w, r)
+	return s.options.getCookieValue(r)
 }
 
 // ResetExpiry resets the age of the session to time.Now(), so that
 // MaxAge calculations are renewed
 func (s *StorageOverseer) ResetExpiry(w http.ResponseWriter, r *http.Request) error {
-	sessID, err := s.options.getCookieValue(w, r)
+	sessID, err := s.options.getCookieValue(r)
 	if err != nil {
 		return errors.Wrap(err, "unable to get session id from cookie")
 	}
@@ -135,7 +150,11 @@ func (s *StorageOverseer) ResetExpiry(w http.ResponseWriter, r *http.Request) er
 
 	// Reset the expiry in the client-side cookie
 	if s.options.MaxAge != 0 {
-		w.(cookieWriter).SetCookie(s.options.makeCookie(sessID))
+		ctx := r.Context()
+		cookies := ctx.Value("cookies").(*cookiesContext)
+		cookies.SetCookie(s.options.makeCookie(sessID))
+		ctx = context.WithValue(ctx, "cookies", cookies)
+		r.WithContext(ctx)
 	}
 
 	return nil

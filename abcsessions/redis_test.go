@@ -10,7 +10,6 @@ import (
 )
 
 func TestRedisStorerNew(t *testing.T) {
-	t.Parallel()
 
 	if testing.Short() {
 		t.Skip("skipping long test")
@@ -34,7 +33,6 @@ func TestRedisStorerNew(t *testing.T) {
 }
 
 func TestRedisStorerNewDefault(t *testing.T) {
-	t.Parallel()
 
 	if testing.Short() {
 		t.Skip("skipping long test")
@@ -55,7 +53,6 @@ func TestRedisStorerNewDefault(t *testing.T) {
 }
 
 func TestRedisStorerAll(t *testing.T) {
-	t.Parallel()
 
 	s, err := NewDefaultRedisStorer("", "", 13)
 	if err != nil {

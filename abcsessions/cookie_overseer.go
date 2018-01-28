@@ -1,6 +1,7 @@
 package abcsessions
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -51,7 +52,7 @@ func NewCookieOverseer(opts CookieOptions, secretKey []byte) *CookieOverseer {
 
 // Get a value from the cookie overseer
 func (c *CookieOverseer) Get(w http.ResponseWriter, r *http.Request) (string, error) {
-	val, err := c.options.getCookieValue(w, r)
+	val, err := c.options.getCookieValue(r)
 	if err != nil {
 		return "", errors.Wrap(err, "unable to get session value from cookie")
 	}
@@ -66,14 +67,24 @@ func (c *CookieOverseer) Set(w http.ResponseWriter, r *http.Request, value strin
 		return errors.Wrap(err, "unable to encode session value into cookie")
 	}
 
-	w.(cookieWriter).SetCookie(c.options.makeCookie(ev))
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
+	}
+
+	cookies.SetCookie(c.options.makeCookie(ev))
+	ctx = context.WithValue(ctx, "cookies", cookies)
+	r.WithContext(ctx)
 
 	return nil
 }
 
 // Del a value from the cookie overseer
 func (c *CookieOverseer) Del(w http.ResponseWriter, r *http.Request) error {
-	c.options.deleteCookie(w)
+	c.options.deleteCookie(r)
 	return nil
 }
 
@@ -96,12 +107,16 @@ func (c *CookieOverseer) ResetExpiry(w http.ResponseWriter, r *http.Request) err
 		return nil
 	}
 
-	val, err := c.options.getCookieValue(w, r)
+	val, err := c.options.getCookieValue(r)
 	if err != nil {
 		return errors.Wrap(err, "unable to get session value from cookie")
 	}
 
-	w.(cookieWriter).SetCookie(c.options.makeCookie(val))
+	ctx := r.Context()
+	cookies := ctx.Value("cookies").(*cookiesContext)
+	cookies.SetCookie(c.options.makeCookie(val))
+	ctx = context.WithValue(ctx, "cookies", cookies)
+	r.WithContext(ctx)
 
 	return nil
 }

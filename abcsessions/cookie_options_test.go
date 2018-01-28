@@ -8,7 +8,6 @@ import (
 )
 
 func TestNewCookieOptions(t *testing.T) {
-	t.Parallel()
 
 	o := NewCookieOptions()
 	if o.Name != "id" {
@@ -26,7 +25,6 @@ func TestNewCookieOptions(t *testing.T) {
 }
 
 func TestMakeCookie(t *testing.T) {
-	t.Parallel()
 
 	o := NewCookieOptions()
 	c := o.makeCookie("test")
@@ -54,19 +52,25 @@ func TestMakeCookie(t *testing.T) {
 }
 
 func TestGetCookieValue(t *testing.T) {
-	t.Parallel()
 
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
 	o := NewCookieOptions()
 
-	_, err := o.getCookieValue(w, r)
+	_, err := o.getCookieValue(r)
 	if err == nil {
 		t.Error("Expected to get error back")
 	}
 
-	w.SetCookie(&http.Cookie{Name: "id", Value: "idvalue"})
-	val, err := o.getCookieValue(w, r)
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
+	}
+
+	cookies.SetCookie(&http.Cookie{Name: "id", Value: "idvalue"})
+	val, err := o.getCookieValue(r)
 	if err != nil {
 		t.Error(err)
 	}
@@ -75,10 +79,10 @@ func TestGetCookieValue(t *testing.T) {
 	}
 
 	// Init a new map to clear out all cookies
-	w.cookies = make(map[string]*http.Cookie)
+	cookies.cookies = make(map[string]*http.Cookie)
 
 	r.AddCookie(o.makeCookie("cookievalue"))
-	val, err = o.getCookieValue(w, r)
+	val, err = o.getCookieValue(r)
 	if err != nil {
 		t.Error(err)
 	}
@@ -87,8 +91,8 @@ func TestGetCookieValue(t *testing.T) {
 	}
 
 	// Ensure "idvalue" (cache storage) takes precedence over "cookievalue" (request cookie)
-	w.SetCookie(&http.Cookie{Name: "id", Value: "idvalue"})
-	val, err = o.getCookieValue(w, r)
+	cookies.SetCookie(&http.Cookie{Name: "id", Value: "idvalue"})
+	val, err = o.getCookieValue(r)
 	if err != nil {
 		t.Error(err)
 	}

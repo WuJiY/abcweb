@@ -13,14 +13,12 @@ var (
 )
 
 func TestStorageImplements(t *testing.T) {
-	t.Parallel()
 
 	// Do assign to nothing to check if implementation of StorageOverseer is complete
 	var _ Overseer = &StorageOverseer{}
 }
 
 func TestStorageOverseerNew(t *testing.T) {
-	t.Parallel()
 
 	opts := CookieOptions{
 		MaxAge:   2,
@@ -53,14 +51,13 @@ func TestStorageOverseerNew(t *testing.T) {
 }
 
 func TestStorageOverseerGetSessionID(t *testing.T) {
-	t.Parallel()
+
 }
 
 func TestStorageOverseerGet(t *testing.T) {
-	t.Parallel()
 
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
@@ -94,10 +91,9 @@ func TestStorageOverseerGet(t *testing.T) {
 }
 
 func TestStorageOverseerSet(t *testing.T) {
-	t.Parallel()
 
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
@@ -112,7 +108,14 @@ func TestStorageOverseerSet(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(w.cookies) != 1 {
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
+	}
+	if len(cookies.cookies) != 1 {
 		t.Errorf("expected set cookie to be set")
 	}
 
@@ -138,7 +141,14 @@ func TestStorageOverseerSet(t *testing.T) {
 		t.Errorf("Expected sessions len 1, got %d", len(m.sessions))
 	}
 
-	if len(w.cookies) != 1 {
+	ctx = r.Context()
+	cookies, ok = ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
+	}
+	if len(cookies.cookies) != 1 {
 		t.Errorf("expected set cookie to be set")
 	}
 
@@ -152,10 +162,8 @@ func TestStorageOverseerSet(t *testing.T) {
 }
 
 func TestStorageOverseerDel(t *testing.T) {
-	t.Parallel()
-
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	opts := NewCookieOptions()
 	m, _ := NewDefaultMemoryStorer()
@@ -184,8 +192,18 @@ func TestStorageOverseerDel(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
+	}
 
-	cookie := w.cookies[opts.Name]
+	cookie := cookies.cookies[opts.Name]
+	if cookie == nil {
+		t.Fatal("no cookie")
+	}
 	if !cookie.Expires.UTC().Before(time.Now().UTC().AddDate(0, 0, -1)) {
 		t.Error("Expected cookie expires to be set to a year ago, but was not:", cookie.Expires.String())
 	}
@@ -206,8 +224,6 @@ func TestStorageOverseerDel(t *testing.T) {
 }
 
 func TestStorageOverseerMakeCookie(t *testing.T) {
-	t.Parallel()
-
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
 	c := s.options.makeCookie("hello")
@@ -230,10 +246,8 @@ func TestStorageOverseerMakeCookie(t *testing.T) {
 }
 
 func TestStorageOverseerRegenerate(t *testing.T) {
-	t.Parallel()
-
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	opts := NewCookieOptions()
 	m, _ := NewDefaultMemoryStorer()
@@ -270,8 +284,18 @@ func TestStorageOverseerRegenerate(t *testing.T) {
 			t.Errorf("Expected val %q to be %q", "test", v.value)
 		}
 	}
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
+	}
 
-	cookie := w.cookies[opts.Name]
+	cookie := cookies.cookies[opts.Name]
+	if cookie == nil {
+		t.Fatal("no cookie")
+	}
 	if cookie.Expires.String() != (time.Time{}).String() {
 		t.Error("Expected cookie Expires to be zero value, but got:", cookie.Expires.String())
 	}
@@ -287,10 +311,8 @@ func TestStorageOverseerRegenerate(t *testing.T) {
 }
 
 func TestStorageOverseerSessionID(t *testing.T) {
-	t.Parallel()
-
 	r := httptest.NewRequest("GET", "http://localhost", nil)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 
 	m, _ := NewDefaultMemoryStorer()
 	s := NewStorageOverseer(NewCookieOptions(), m)
@@ -324,8 +346,6 @@ func TestStorageOverseerSessionID(t *testing.T) {
 }
 
 func TestStorageOverseerResetExpiry(t *testing.T) {
-	t.Parallel()
-
 	opts := NewCookieOptions()
 	opts.MaxAge = time.Hour * 1
 
@@ -335,7 +355,7 @@ func TestStorageOverseerResetExpiry(t *testing.T) {
 	}
 
 	c := NewStorageOverseer(opts, mem)
-	w := newSessionsResponseWriter(httptest.NewRecorder())
+	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/", nil)
 
 	err = c.ResetExpiry(w, r)
@@ -348,11 +368,19 @@ func TestStorageOverseerResetExpiry(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(w.cookies) != 1 {
-		t.Errorf("Expected cookies len 1, got %d", len(w.cookies))
+	ctx := r.Context()
+	cookies, ok := ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
 	}
 
-	oldCookie := w.cookies[opts.Name]
+	if len(cookies.cookies) != 1 {
+		t.Errorf("Expected cookies len 1, got %d", len(cookies.cookies))
+	}
+
+	oldCookie := cookies.cookies[opts.Name]
 
 	// Sleep for a ms to offset time
 	time.Sleep(time.Nanosecond * 1)
@@ -361,13 +389,22 @@ func TestStorageOverseerResetExpiry(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
-	if len(w.cookies) != 1 {
-		t.Errorf("Expected cookies len 1, got %d", len(w.cookies))
+	ctx = r.Context()
+	cookies, ok = ctx.Value("cookies").(*cookiesContext)
+	if !ok {
+		cookies = &cookiesContext{
+			cookies: make(map[string]*http.Cookie),
+		}
 	}
 
-	newCookie := w.cookies[opts.Name]
+	if len(cookies.cookies) != 1 {
+		t.Errorf("Expected cookies len 1, got %d", len(cookies.cookies))
+	}
 
+	newCookie := cookies.cookies[opts.Name]
+	if newCookie == nil {
+		t.Fatal("no cookie")
+	}
 	if !newCookie.Expires.After(oldCookie.Expires) || newCookie.Expires == oldCookie.Expires {
 		t.Errorf("Expected oldcookie and newcookie expires to be different, got:\n\n%#v\n%#v", oldCookie, newCookie)
 	}
